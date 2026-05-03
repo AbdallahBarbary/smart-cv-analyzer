@@ -1,0 +1,16 @@
+{
+  "Providers": [
+    {
+      "name": "agent-router",
+      "api_base_url": "https://agent-router.com",
+      "api_key": "sk-FRuNxC4hwMmKDelqRc4ft1GBpVmesljEk3RBaMLbwoJCx1p3",
+      "models": [
+        "anthropic/claude-3.5-sonnet"
+      ],
+      "transformer": { "use": ["openrouter"] }
+    }
+  ],
+  "Router": {
+    "default": "agent-router,anthropic/claude-3.5-sonnet"
+  }
+}
