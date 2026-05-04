@@ -4,8 +4,10 @@ import { analyzeCV, analyzeCVFile, rewriteCV } from "../app/lib/api";
 
 interface Props { lang: string; cvText: string; setCvText: (t: string) => void; }
 
-const card: React.CSSProperties = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '24px', backdropFilter: 'blur(20px)' };
-const lbl: React.CSSProperties = { fontFamily: "'Syne', sans-serif", fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text3)', marginBottom: '8px', display: 'block' };
+const P: React.CSSProperties = {
+  background: 'rgba(13,17,24,0.95)', border: '1px solid rgba(0,255,136,0.1)',
+  position: 'relative', overflow: 'hidden',
+};
 
 export default function CVAnalyzer({ lang, cvText, setCvText }: Props) {
   const [loading, setLoading] = useState(false);
@@ -20,7 +22,7 @@ export default function CVAnalyzer({ lang, cvText, setCvText }: Props) {
 
   const handleFile = useCallback((file: File) => {
     if (!file.name.match(/\.(pdf|docx|doc)$/i)) {
-      alert(t("Please upload a PDF or Word document.", "من فضلك ارفع PDF أو Word."));
+      alert("Please upload PDF or Word (.pdf, .docx, .doc)");
       return;
     }
     setUploadedFile(file);
@@ -32,143 +34,130 @@ export default function CVAnalyzer({ lang, cvText, setCvText }: Props) {
     if (file) handleFile(file);
   }, [handleFile]);
 
- const handleAnalyze = async () => {
-  setLoading(true);
-  try {
-    let data: any;
-    if (uploadedFile && inputMode === "file") {
-      data = await analyzeCVFile(uploadedFile, lang);
-    } else {
-      if (!cvText.trim()) { setLoading(false); return; }
-      data = await analyzeCV(cvText, lang);
-    }
-
-    if (data.error) {
-      alert(data.error);
-      setLoading(false);
-      return;
-    }
-
-    // Sync CV text to global state so other tabs can use it
-    if (data.cv_text) setCvText(data.cv_text);
-    setResult(data);
-  } catch (e) {
-    console.error(e);
-    alert(t(
-      "Analysis failed. Make sure backend is running at localhost:8000",
-      "فشل التحليل. تأكد من تشغيل الباكند"
-    ));
-  }
-  setLoading(false);
-};
-  const handleRewrite = async () => {
-    setRewriting(true);
+  const handleAnalyze = async () => {
+    setLoading(true);
     try {
-      const res = await rewriteCV(cvText, lang);
-      setRewritten(res.bullets);
-    } catch {}
-    setRewriting(false);
+      let res;
+      if (uploadedFile && inputMode === "file") {
+        res = await analyzeCVFile(uploadedFile, lang);
+      } else {
+        if (!cvText.trim()) { setLoading(false); return; }
+        res = await analyzeCV(cvText, lang);
+      }
+      setResult(res);
+    } catch {
+      alert(t("Analysis failed. Make sure the backend is running.", "فشل التحليل."));
+    }
+    setLoading(false);
   };
 
-  const scoreColor = (s: number) => s >= 75 ? '#00e5a0' : s >= 50 ? '#ffb800' : '#ff6b6b';
+  const sc = (n: number) => n >= 75 ? '#00ff88' : n >= 50 ? '#ffaa00' : '#ff3366';
 
   if (result) return (
-    <div style={{ animation: 'fadeUp 0.5s cubic-bezier(0.22,1,0.36,1)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+    <div className="animate-fadeUp">
+      {/* Page header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontWeight: '800', fontSize: '1.8rem', color: 'var(--text)', margin: 0 }}>
-            {t("Analysis Results", "نتائج التحليل")}
-          </h2>
-          <p style={{ color: 'var(--text3)', fontSize: '0.85rem', margin: '4px 0 0' }}>
-            {result.seniority_level} · {result.years_experience}y exp
-          </p>
+          <div className="data-label" style={{ marginBottom: '6px' }}>// ANALYSIS_OUTPUT</div>
+          <h1 style={{ fontFamily: 'var(--cond)', fontWeight: '800', fontSize: '2.4rem', color: 'var(--text)', letterSpacing: '0.04em', lineHeight: 1 }}>
+            CV ANALYSIS <span style={{ color: 'var(--accent)' }}>COMPLETE</span>
+          </h1>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', color: 'var(--text2)', marginTop: '6px' }}>
+            {result.seniority_level} · EXP: {result.years_experience}Y · PROCESSED {new Date().toISOString().slice(0,10)}
+          </div>
         </div>
         <button onClick={() => { setResult(null); setRewritten(null); }} className="btn-ghost">
-          ← {t("Back", "رجوع")}
+          ← BACK
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '16px', marginBottom: '16px' }}>
-        <div style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-          <div style={{ position: 'relative', width: '110px', height: '110px' }}>
-            <svg viewBox="0 0 100 100" style={{ width: '100%', transform: 'rotate(-90deg)' }}>
-              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8"/>
-              <circle cx="50" cy="50" r="40" fill="none" stroke={scoreColor(result.score)} strokeWidth="8" strokeLinecap="round"
-                strokeDasharray="251" strokeDashoffset={251 - (251 * result.score / 100)}
-                style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.22,1,0.36,1)', filter: `drop-shadow(0 0 8px ${scoreColor(result.score)})` }}
-              />
-            </svg>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: '1.7rem', fontWeight: '800', color: scoreColor(result.score) }}>{result.score}</span>
-              <span style={{ fontSize: '0.6rem', color: 'var(--text3)', letterSpacing: '0.05em' }}>SCORE</span>
-            </div>
+      {/* Top metrics row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr 1fr 1fr', gap: '1px', marginBottom: '24px', border: '1px solid var(--border)', background: 'var(--border)' }}>
+        {/* Big score */}
+        <div style={{ ...P, padding: '24px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.6)' }}>
+          <div className="data-label" style={{ marginBottom: '8px' }}>TOTAL SCORE</div>
+          <div className="big-number" style={{ fontSize: '4rem', color: sc(result.score), textShadow: `0 0 30px ${sc(result.score)}66` }}>
+            {result.score}
           </div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: '0.78rem', fontWeight: '700', color: scoreColor(result.score) }}>
-            {result.score >= 75 ? t("Excellent", "ممتاز") : result.score >= 50 ? t("Good", "جيد") : t("Needs Work", "يحتاج تحسين")}
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '0.65rem', color: sc(result.score), marginTop: '4px', letterSpacing: '0.1em' }}>
+            {result.score >= 75 ? 'EXCELLENT' : result.score >= 50 ? 'AVERAGE' : 'POOR'}
           </div>
         </div>
 
-        <div style={card}>
-          <span style={lbl}>{t("Breakdown", "التفاصيل")}</span>
-          {([["skills_score", t("Skills","مهارات")], ["experience_score", t("Experience","خبرة")], ["education_score", t("Education","تعليم")], ["formatting_score", t("Formatting","تنسيق")]] as [string,string][]).map(([key, label]) => (
-            <div key={key} style={{ marginBottom: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                <span style={{ fontSize: '0.82rem', color: 'var(--text2)' }}>{label}</span>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: '0.8rem', fontWeight: '700', color: scoreColor(result[key]) }}>{result[key]}</span>
-              </div>
-              <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '100px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', borderRadius: '100px', background: scoreColor(result[key]), width: `${result[key]}%`, transition: 'width 1s cubic-bezier(0.22,1,0.36,1)', boxShadow: `0 0 6px ${scoreColor(result[key])}66` }} />
-              </div>
+        {/* Sub scores */}
+        {[
+          ["SKILLS", result.skills_score],
+          ["EXPERIENCE", result.experience_score],
+          ["EDUCATION", result.education_score],
+          ["FORMAT", result.formatting_score],
+        ].map(([label, val]: any, i) => (
+          <div key={label} style={{ ...P, padding: '20px', background: 'rgba(5,6,9,0.9)' }}>
+            <div className="data-label" style={{ marginBottom: '8px' }}>{label}</div>
+            <div className="big-number" style={{ fontSize: '2.2rem', color: sc(val), marginBottom: '10px' }}>{val}</div>
+            <div style={{ height: '2px', background: 'rgba(255,255,255,0.05)', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${val}%`, background: sc(val), boxShadow: `0 0 6px ${sc(val)}`, transition: 'width 1s cubic-bezier(0.22,1,0.36,1)' }} />
             </div>
-          ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Skills + Info row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+        <div style={{ ...P, padding: '20px' }}>
+          <div className="data-label" style={{ marginBottom: '12px' }}>// DETECTED_SKILLS</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {result.skills?.map((s: string) => <span key={s} className="tag tag-green">{s}</span>)}
+          </div>
+        </div>
+        <div style={{ ...P, padding: '20px' }}>
+          <div className="data-label" style={{ marginBottom: '12px' }}>// IMPACT_VECTOR</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '0.78rem', color: 'var(--accent)', lineHeight: '1.7', borderLeft: '2px solid var(--accent)', paddingLeft: '12px' }}>
+            {result.impact_suggestion}
+          </div>
         </div>
       </div>
 
-      <div style={{ ...card, marginBottom: '12px' }}>
-        <span style={lbl}>{t("Skills", "المهارات")}</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {result.skills?.map((s: string) => <span key={s} className="tag tag-blue">{s}</span>)}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-        <div style={card}>
-          <span style={lbl}>{t("Strengths", "نقاط القوة")}</span>
+      {/* Strengths / Weaknesses */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ ...P, padding: '20px' }}>
+          <div className="data-label" style={{ marginBottom: '12px', color: 'var(--accent)' }}>▲ STRENGTHS</div>
           {result.strengths?.map((s: string, i: number) => (
-            <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ color: 'var(--accent)', flexShrink: 0 }}>✓</span>
-              <span style={{ fontSize: '0.84rem', color: 'var(--text2)', lineHeight: '1.5' }}>{s}</span>
+            <div key={i} style={{ display: 'flex', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent)', fontSize: '0.7rem', flexShrink: 0, marginTop: '2px' }}>+</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text)', lineHeight: '1.5' }}>{s}</span>
             </div>
           ))}
         </div>
-        <div style={card}>
-          <span style={lbl}>{t("To Improve", "للتحسين")}</span>
+        <div style={{ ...P, padding: '20px' }}>
+          <div className="data-label" style={{ marginBottom: '12px', color: 'var(--amber)' }}>▼ WEAKNESSES</div>
           {result.weaknesses?.map((s: string, i: number) => (
-            <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ color: '#ffb800', flexShrink: 0 }}>!</span>
-              <span style={{ fontSize: '0.84rem', color: 'var(--text2)', lineHeight: '1.5' }}>{s}</span>
+            <div key={i} style={{ display: 'flex', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontFamily: 'var(--mono)', color: 'var(--amber)', fontSize: '0.7rem', flexShrink: 0, marginTop: '2px' }}>!</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text)', lineHeight: '1.5' }}>{s}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ ...card, marginBottom: '20px', borderLeft: '3px solid var(--accent2)', background: 'rgba(124,106,255,0.06)' }}>
-        <span style={{ fontSize: '0.88rem', color: 'var(--text)', lineHeight: '1.6' }}>💡 {result.impact_suggestion}</span>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        {cvText && (
+          <button onClick={async () => {
+            setRewriting(true);
+            try { setRewritten((await rewriteCV(cvText, lang)).bullets); } catch {}
+            setRewriting(false);
+          }} disabled={rewriting} className="btn-primary">
+            {rewriting ? <><span className="spinner" />REWRITING...</> : '✦ AUTO-REWRITE WEAK POINTS'}
+          </button>
+        )}
       </div>
-
-      {cvText && (
-        <button onClick={handleRewrite} disabled={rewriting} className="btn-primary">
-          {rewriting ? <><span className="spinner" />{t("Rewriting...", "جاري الإعادة...")}</> : `✦ ${t("Auto-Rewrite Weak Points", "أعد كتابة النقاط الضعيفة")}`}
-        </button>
-      )}
 
       {rewritten && (
-        <div style={{ ...card, marginTop: '16px' }}>
-          <span style={lbl}>{t("Rewritten Bullets", "نقاط معاد كتابتها")}</span>
+        <div style={{ ...P, padding: '24px', marginTop: '16px' }}>
+          <div className="data-label" style={{ marginBottom: '16px' }}>// REWRITTEN_BULLETS</div>
           {rewritten.map((b: any, i: number) => (
-            <div key={i} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '14px', marginBottom: '14px' }}>
-              <div style={{ fontSize: '0.81rem', color: 'var(--text3)', textDecoration: 'line-through', marginBottom: '6px' }}>{b.original}</div>
-              <div style={{ fontSize: '0.84rem', color: 'var(--accent)' }}>→ {b.improved}</div>
+            <div key={i} style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '0.75rem', color: 'var(--text3)', textDecoration: 'line-through', marginBottom: '6px' }}>BEFORE: {b.original}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '0.78rem', color: 'var(--accent)' }}>AFTER: {b.improved}</div>
             </div>
           ))}
         </div>
@@ -177,27 +166,31 @@ export default function CVAnalyzer({ lang, cvText, setCvText }: Props) {
   );
 
   return (
-    <div style={{ animation: 'fadeUp 0.5s cubic-bezier(0.22,1,0.36,1)' }}>
-      <div style={{ marginBottom: '28px' }}>
-        <h2 style={{ fontFamily: "'Syne', sans-serif", fontWeight: '800', fontSize: '2rem', color: 'var(--text)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-          {t("Analyze Your CV", "تحليل سيرتك الذاتية")}
-        </h2>
-        <p style={{ color: 'var(--text3)', fontSize: '0.9rem' }}>
-          {t("Upload PDF/Word or paste text — syncs to all other features automatically", "ارفع PDF أو Word أو الصق نص — يتزامن مع كل الميزات تلقائياً")}
+    <div className="animate-fadeUp">
+      <div style={{ marginBottom: '32px' }}>
+        <div className="data-label" style={{ marginBottom: '6px' }}>// MODULE_01</div>
+        <h1 style={{ fontFamily: 'var(--cond)', fontWeight: '800', fontSize: '2.6rem', color: 'var(--text)', letterSpacing: '0.04em', lineHeight: 1, marginBottom: '8px' }}>
+          CV <span style={{ color: 'var(--accent)' }}>ANALYZER</span>
+        </h1>
+        <p style={{ fontFamily: 'var(--mono)', fontSize: '0.75rem', color: 'var(--text2)', letterSpacing: '0.04em' }}>
+          UPLOAD PDF/DOCX OR PASTE TEXT — SYNCS ACROSS ALL MODULES
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+      {/* Mode selector */}
+      <div style={{ display: 'flex', gap: '0', marginBottom: '20px', border: '1px solid var(--border)', width: 'fit-content' }}>
         {(["file", "text"] as const).map(mode => (
           <button key={mode} onClick={() => setInputMode(mode)} style={{
-            padding: '8px 20px', borderRadius: '10px', border: '1px solid',
-            borderColor: inputMode === mode ? 'var(--accent)' : 'var(--border)',
-            background: inputMode === mode ? 'rgba(0,229,160,0.1)' : 'transparent',
-            color: inputMode === mode ? 'var(--accent)' : 'var(--text2)',
-            fontFamily: "'Syne', sans-serif", fontSize: '0.8rem', fontWeight: '600',
-            cursor: 'pointer', transition: 'all 0.2s',
+            padding: '8px 20px',
+            border: 'none',
+            background: inputMode === mode ? 'rgba(0,255,136,0.1)' : 'transparent',
+            color: inputMode === mode ? 'var(--accent)' : 'var(--text3)',
+            fontFamily: 'var(--mono)', fontSize: '0.68rem',
+            letterSpacing: '0.1em', textTransform: 'uppercase',
+            cursor: 'pointer', transition: 'all 0.15s',
+            borderRight: mode === "file" ? '1px solid var(--border)' : 'none',
           }}>
-            {mode === "file" ? `📁 ${t("Upload File", "رفع ملف")}` : `✏️ ${t("Paste Text", "لصق نص")}`}
+            {mode === "file" ? "[ UPLOAD FILE ]" : "[ PASTE TEXT ]"}
           </button>
         ))}
       </div>
@@ -209,36 +202,42 @@ export default function CVAnalyzer({ lang, cvText, setCvText }: Props) {
           onDrop={onDrop}
           onClick={() => fileRef.current?.click()}
           style={{
-            border: `2px dashed ${dragOver ? 'var(--accent)' : uploadedFile ? 'rgba(0,229,160,0.4)' : 'var(--border)'}`,
-            borderRadius: '16px', padding: '52px 24px', textAlign: 'center',
+            border: `1px dashed ${dragOver ? 'var(--accent)' : uploadedFile ? 'rgba(0,255,136,0.5)' : 'rgba(0,255,136,0.15)'}`,
+            padding: '56px 24px', textAlign: 'center',
             cursor: 'pointer', transition: 'all 0.2s', marginBottom: '20px',
-            background: dragOver ? 'rgba(0,229,160,0.05)' : uploadedFile ? 'rgba(0,229,160,0.03)' : 'var(--surface)',
+            background: dragOver ? 'rgba(0,255,136,0.04)' : uploadedFile ? 'rgba(0,255,136,0.02)' : 'rgba(0,0,0,0.3)',
+            position: 'relative', overflow: 'hidden',
           }}
         >
+          {/* corner marks */}
+          {[{top:0,left:0,bt:'1px 0 0 1px'},{top:0,right:0,bt:'1px 1px 0 0'},{bottom:0,left:0,bt:'0 0 1px 1px'},{bottom:0,right:0,bt:'0 1px 1px 0'}].map((pos,i) => (
+            <div key={i} style={{ position:'absolute', width:'16px', height:'16px', border:`1px solid var(--accent2)`, borderWidth: pos.bt, opacity:0.5, ...pos }} />
+          ))}
           <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
             onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
-          <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>{uploadedFile ? '✅' : '📄'}</div>
           {uploadedFile ? (
-            <>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: '700', color: 'var(--accent)', fontSize: '1rem' }}>{uploadedFile.name}</div>
-              <div style={{ color: 'var(--text3)', fontSize: '0.8rem', marginTop: '4px' }}>
-                {(uploadedFile.size / 1024).toFixed(0)} KB · {t("Click to change", "اضغط للتغيير")}
+            <div>
+              <div style={{ fontFamily: 'var(--mono)', color: 'var(--accent)', fontSize: '0.85rem', marginBottom: '6px', letterSpacing: '0.05em' }}>
+                FILE_LOADED: {uploadedFile.name}
               </div>
-            </>
+              <div style={{ fontFamily: 'var(--mono)', color: 'var(--text3)', fontSize: '0.7rem' }}>
+                SIZE: {(uploadedFile.size / 1024).toFixed(1)}KB — CLICK TO CHANGE
+              </div>
+            </div>
           ) : (
-            <>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: '700', color: 'var(--text)', fontSize: '1rem', marginBottom: '4px' }}>
-                {t("Drop your CV here", "أفلت CV هنا")}
+            <div>
+              <div style={{ fontFamily: 'var(--cond)', fontWeight: '700', color: 'var(--text2)', fontSize: '1.1rem', letterSpacing: '0.1em', marginBottom: '8px' }}>
+                DROP FILE HERE OR CLICK TO BROWSE
               </div>
-              <div style={{ color: 'var(--text3)', fontSize: '0.82rem' }}>
-                {t("PDF, DOC, DOCX · Syncs to all features", "PDF, DOC, DOCX · يتزامن مع كل الميزات")}
+              <div style={{ fontFamily: 'var(--mono)', color: 'var(--text3)', fontSize: '0.68rem', letterSpacing: '0.08em' }}>
+                SUPPORTED: PDF · DOCX · DOC
               </div>
-            </>
+            </div>
           )}
         </div>
       ) : (
-        <textarea className="input-field" style={{ minHeight: '200px', marginBottom: '20px' }}
-          placeholder={t("Paste your full CV here...", "الصق CV هنا...")}
+        <textarea className="input-field" style={{ minHeight: '220px', marginBottom: '20px', fontFamily: 'var(--mono)', fontSize: '0.8rem', lineHeight: '1.6' }}
+          placeholder="> PASTE CV TEXT HERE..."
           value={cvText} onChange={e => setCvText(e.target.value)}
         />
       )}
@@ -247,7 +246,7 @@ export default function CVAnalyzer({ lang, cvText, setCvText }: Props) {
         <button onClick={handleAnalyze}
           disabled={loading || (inputMode === "file" ? !uploadedFile : !cvText.trim())}
           className="btn-primary">
-          {loading ? <><span className="spinner" />{t("Analyzing...", "جاري التحليل...")}</> : `◈ ${t("Analyze CV", "تحليل CV")}`}
+          {loading ? <><span className="spinner" />ANALYZING...</> : 'RUN ANALYSIS →'}
         </button>
       </div>
     </div>
