@@ -34,7 +34,7 @@ export default function JobMatch({ lang, cvText }: Props) {
     }
     setSearching(true); setError("");
     try {
-      const data = await searchJobs(cvText, "Remote", lang, 10);
+      const data = await searchJobs(cvText, lang);
       setJobs(data.jobs || []);
       setView("auto");
     } catch {

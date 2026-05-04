@@ -1,12 +1,23 @@
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+async function throwApiError(res: Response, fallbackMessage: string): Promise<never> {
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {
+    // ignore parse errors and use fallback below
+  }
+  const message = data?.detail || data?.error || fallbackMessage;
+  throw new Error(message);
+}
+
 // ── CV ──────────────────────────────────────────────
 export async function analyzeCV(cvText: string, language: string) {
   const form = new FormData();
   form.append("cv_text", cvText);
   form.append("language", language);
   const res = await fetch(`${API}/api/cv/analyze`, { method: "POST", body: form });
-  if (!res.ok) throw new Error("CV analysis failed");
+  if (!res.ok) await throwApiError(res, "CV analysis failed");
   return res.json();
 }
 
@@ -15,8 +26,20 @@ export async function analyzeCVFile(file: File, language: string) {
   form.append("file", file);
   form.append("language", language);
   const res = await fetch(`${API}/api/cv/analyze`, { method: "POST", body: form });
-  if (!res.ok) throw new Error("CV file analysis failed");
+  if (!res.ok) await throwApiError(res, "CV file analysis failed");
   return res.json();
+}
+
+export async function extractCVText(file: File, language: string) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("language", language);
+  const res = await fetch(`${API}/api/cv/extract`, { method: "POST", body: form });
+  if (!res.ok) await throwApiError(res, "CV extraction failed");
+  const data = await res.json();
+  if (data?.error) throw new Error(data.error);
+  if (!data?.text?.trim()) throw new Error("No text extracted from CV file");
+  return data.text as string;
 }
 
 export async function rewriteCV(cvText: string, language: string) {
@@ -36,6 +59,19 @@ export async function generateAtsCV(cvText: string, jobDescription: string, lang
   const res = await fetch(`${API}/api/cv/generate`, { method: "POST", body: form });
   if (!res.ok) throw new Error("CV generation failed");
   return res.json();
+}
+
+export async function exportGeneratedCV(cvText: string, exportFormat: "pdf" | "docx") {
+  const form = new FormData();
+  form.append("cv_text", cvText);
+  form.append("export_format", exportFormat);
+  const res = await fetch(`${API}/api/cv/export`, { method: "POST", body: form });
+  if (!res.ok) await throwApiError(res, "CV export failed");
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="([^"]+)"/i);
+  const filename = match?.[1] || `ATS_Optimized_CV.${exportFormat}`;
+  return { blob, filename };
 }
 
 // ── JOBS ─────────────────────────────────────────────

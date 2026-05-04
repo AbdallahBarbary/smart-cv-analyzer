@@ -1,8 +1,11 @@
-from fastapi import APIRouter, UploadFile, File, Form, Depends
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from services.ai_service import analyze_cv_with_ai, rewrite_cv_bullets, generate_ats_cv
+from services.cv_export import export_cv, build_export_filename
 from services.file_parser import parse_file
 from database.db import get_db, CVAnalysis
+import io
 
 router = APIRouter()
 
@@ -33,7 +36,12 @@ async def analyze_cv(
     if not text:
         return {"error": "Please provide a CV file or paste CV text"}
 
-    result = await analyze_cv_with_ai(text, language)
+    try:
+        result = await analyze_cv_with_ai(text, language)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="CV analysis failed")
 
     try:
         db_record = CVAnalysis(
@@ -70,3 +78,33 @@ async def generate_cv(
     language: str = Form("en")
 ):
     return await generate_ats_cv(cv_text, job_description, language)
+
+
+@router.post("/export")
+async def export_generated_cv(
+    cv_text: str = Form(...),
+    export_format: str = Form("pdf")
+):
+    if not cv_text or not cv_text.strip():
+        raise HTTPException(status_code=400, detail="cv_text is required")
+
+    fmt = export_format.lower().strip()
+    if fmt not in {"pdf", "docx"}:
+        raise HTTPException(status_code=400, detail="export_format must be 'pdf' or 'docx'")
+
+    try:
+        content = export_cv(cv_text, fmt)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to export CV file")
+
+    mime_type = (
+        "application/pdf"
+        if fmt == "pdf"
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    filename = build_export_filename(cv_text, fmt)
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type=mime_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useCallback } from "react";
-import { analyzeCV, analyzeCVFile, rewriteCV } from "../app/lib/api";
+import { analyzeCV, extractCVText, rewriteCV } from "../app/lib/api";
 
 interface Props { lang: string; cvText: string; setCvText: (t: string) => void; }
 
@@ -39,14 +39,16 @@ export default function CVAnalyzer({ lang, cvText, setCvText }: Props) {
     try {
       let res;
       if (uploadedFile && inputMode === "file") {
-        res = await analyzeCVFile(uploadedFile, lang);
+        const extractedText = await extractCVText(uploadedFile, lang);
+        setCvText(extractedText);
+        res = await analyzeCV(extractedText, lang);
       } else {
         if (!cvText.trim()) { setLoading(false); return; }
         res = await analyzeCV(cvText, lang);
       }
       setResult(res);
-    } catch {
-      alert(t("Analysis failed. Make sure the backend is running.", "فشل التحليل."));
+    } catch (err: any) {
+      alert(err?.message || t("Analysis failed. Make sure the backend is running.", "فشل التحليل."));
     }
     setLoading(false);
   };

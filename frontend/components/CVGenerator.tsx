@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useCallback } from "react";
-import { generateAtsCV } from "../app/lib/api";
+import { exportGeneratedCV, generateAtsCV } from "../app/lib/api";
 
 interface Props { lang: string; cvText: string; setCvText: (t: string) => void; }
 
@@ -11,6 +11,7 @@ export default function CVGenerator({ lang, cvText, setCvText }: Props) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState<"" | "pdf" | "docx">("");
   const [localCV, setLocalCV] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -30,6 +31,23 @@ export default function CVGenerator({ lang, cvText, setCvText }: Props) {
     try { setResult(await generateAtsCV(activeCV, jobDesc, lang)); }
     catch { alert("Generation failed. Is the backend running?"); }
     setLoading(false);
+  };
+
+  const handleExport = async (format: "pdf" | "docx") => {
+    if (!result?.cv_text?.trim()) return;
+    setExporting(format);
+    try {
+      const { blob, filename } = await exportGeneratedCV(result.cv_text, format);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err?.message || "Failed to export CV");
+    }
+    setExporting("");
   };
 
   return (
@@ -153,11 +171,12 @@ export default function CVGenerator({ lang, cvText, setCvText }: Props) {
                 <button className="btn-ghost" onClick={() => { navigator.clipboard.writeText(result.cv_text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
                   {copied ? 'COPIED ✓' : '⎘ COPY'}
                 </button>
-                <button className="btn-ghost" onClick={() => {
-                  const b = new Blob([result.cv_text], { type: 'text/plain' });
-                  const u = URL.createObjectURL(b); const a = document.createElement('a');
-                  a.href = u; a.download = 'ATS_CV.txt'; a.click(); URL.revokeObjectURL(u);
-                }}>↓ DOWNLOAD</button>
+                <button className="btn-ghost" onClick={() => handleExport("pdf")} disabled={exporting !== ""}>
+                  {exporting === "pdf" ? "PDF..." : "↓ PDF"}
+                </button>
+                <button className="btn-ghost" onClick={() => handleExport("docx")} disabled={exporting !== ""}>
+                  {exporting === "docx" ? "WORD..." : "↓ WORD"}
+                </button>
               </div>
             </div>
             <pre style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border)', padding: '20px', fontSize: '0.77rem', color: 'var(--text2)', whiteSpace: 'pre-wrap', lineHeight: '1.7', maxHeight: '420px', overflowY: 'auto', fontFamily: 'var(--mono)' }}>

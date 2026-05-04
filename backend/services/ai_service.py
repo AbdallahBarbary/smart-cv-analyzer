@@ -4,7 +4,22 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+_client = None
+
+
+def get_client() -> Groq:
+    global _client
+    if _client is not None:
+        return _client
+
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "GROQ_API_KEY is missing. Add it to backend/.env to enable AI features."
+        )
+
+    _client = Groq(api_key=api_key)
+    return _client
 
 
 def clean_json(text: str) -> dict:
@@ -21,6 +36,7 @@ def clean_json(text: str) -> dict:
 
 
 def ask_ai(prompt: str, max_tokens: int = 1500) -> str:
+    client = get_client()
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],

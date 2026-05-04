@@ -175,7 +175,7 @@ export default function Home() {
         <div key={activeTab} className="animate-fadeUp">
           {activeTab === "cv"        && <CVAnalyzer      lang={lang} cvText={cvText} setCvText={setCvText} />}
           {activeTab === "generate"  && <CVGenerator     lang={lang} cvText={cvText} setCvText={setCvText} />}
-          {activeTab === "job"       && <JobMatch        lang={lang} cvText={cvText} setCvText={setCvText} />}
+          {activeTab === "job"       && <JobMatch        lang={lang} cvText={cvText} />}
           {activeTab === "search"    && <JobSearch       lang={lang} cvText={cvText} setCvText={setCvText} />}
           {activeTab === "ats"       && <ATSCheck        lang={lang} cvText={cvText} setCvText={setCvText} />}
           {activeTab === "interview" && <InterviewSim    lang={lang} />}
